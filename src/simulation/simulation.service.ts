@@ -2,10 +2,10 @@ import { Injectable } from '@nestjs/common';
 
 @Injectable()
 export class SimulationService {
-  getSlowResponse(delay:number): Promise<string> {
+  wait(delay:number): Promise<void> {
     return new Promise((resolve) => {
       setTimeout(() => {
-        resolve('slow response');
+        resolve();
       }, delay);
     });
   }

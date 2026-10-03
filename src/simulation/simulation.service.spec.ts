@@ -7,14 +7,22 @@ describe('SimulationService', () => {
     simulationService = new SimulationService();
   });
 
-  it('returns slow response after the requested delay', async () => {
+  it('completes after the requested delay', async () => {
     jest.useFakeTimers();
+    let completed = false;
+    const result = simulationService.wait(3000).then(() => {
+      completed = true;
+    });
 
-    const result = simulationService.getSlowResponse(3000);
+    await jest.advanceTimersByTimeAsync(2999);
 
-    await jest.advanceTimersByTimeAsync(3000);
+    expect(completed).toBe(false);
 
-    await expect(result).resolves.toBe('slow response');
+    await jest.advanceTimersByTimeAsync(1);
+
+    expect(completed).toBe(true);
+
+    await expect(result).resolves.toBeUndefined();
   });
 
   afterEach(() => {
