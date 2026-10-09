@@ -6,7 +6,7 @@ import {
   ValidationPipe,
 } from '@nestjs/common';
 import { SimulationService } from './simulation.service';
-import { SlowQueryDto } from './dto/slow-query.dto';
+import { SlowQueryDto, UnavailableQueryDto } from './dto/slow-query.dto';
 
 @Controller('simulate')
 export class SimulationController {
@@ -14,7 +14,7 @@ export class SimulationController {
 
   @Get('slow')
   async getSlowResponse(
-    @Query(new ValidationPipe({ transform: true })) slowQueryDto: SlowQueryDto,
+    @Query() slowQueryDto: SlowQueryDto,
   ): Promise<string> {
     await this.simulationService.wait(slowQueryDto.delay);
     return 'slow response';
@@ -22,9 +22,9 @@ export class SimulationController {
 
   @Get('unavailable')
   async getUnavailableResponse(
-    @Query(new ValidationPipe({ transform: true })) slowQueryDto: SlowQueryDto,
+    @Query() unavailableQueryDto: UnavailableQueryDto,
   ) {
-    await this.simulationService.wait(slowQueryDto.delay);
+    await this.simulationService.wait(unavailableQueryDto.delay);
     throw new ServiceUnavailableException('Simulated service unavailable');
   }
 }
