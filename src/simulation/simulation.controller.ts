@@ -1,21 +1,28 @@
 import {
+  Body,
   Controller,
   Get,
+  HttpException,
+  HttpStatus,
+  NotFoundException,
+  Param,
+  Post,
   Query,
+  Res,
   ServiceUnavailableException,
-  ValidationPipe,
 } from '@nestjs/common';
 import { SimulationService } from './simulation.service';
 import { SlowQueryDto, UnavailableQueryDto } from './dto/slow-query.dto';
+import { CreateRateLimitDto } from './dto/create-rate-limit.dto';
+import type { Response } from 'express';
+import { RateLimitResult } from './types/rate-limit.types';
 
 @Controller('simulate')
 export class SimulationController {
   constructor(private readonly simulationService: SimulationService) {}
 
   @Get('slow')
-  async getSlowResponse(
-    @Query() slowQueryDto: SlowQueryDto,
-  ): Promise<string> {
+  async getSlowResponse(@Query() slowQueryDto: SlowQueryDto): Promise<string> {
     await this.simulationService.wait(slowQueryDto.delay);
     return 'slow response';
   }
@@ -26,5 +33,49 @@ export class SimulationController {
   ) {
     await this.simulationService.wait(unavailableQueryDto.delay);
     throw new ServiceUnavailableException('Simulated service unavailable');
+  }
+
+  @Post('rate-limit')
+  createRateLimitSimulation(@Body() createRateLimitDto: CreateRateLimitDto) {
+    return this.simulationService.createRateLimitSimulation(
+      createRateLimitDto.limit,
+      createRateLimitDto.windowSeconds,
+    );
+  }
+
+  private handleRateLimitResult(
+    result: RateLimitResult,
+    response: Response,
+  ): string {
+    if (result.outcome === 'not-found') {
+      throw new NotFoundException('Rate-limit simulation not found');
+    }
+
+    if (result.outcome === 'rate-limited') {
+      response.setHeader('Retry-After', result.retryAfterSeconds.toString());
+      throw new HttpException(
+        'Rate limit exceeded',
+        HttpStatus.TOO_MANY_REQUESTS,
+      );
+    }
+
+    return 'rate-limit response';
+  }
+
+  @Get('rate-limit/:id')
+  checkRateLimit(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response,
+  ): string {
+    const result = this.simulationService.checkRateLimit(id);
+    return this.handleRateLimitResult(result, response);
+  }
+
+  @Get('rate-limit')
+  checkDefaultRateLimit(
+    @Res({ passthrough: true }) response: Response,
+  ): string {
+    const result = this.simulationService.checkDefaultRateLimit();
+    return this.handleRateLimitResult(result, response);
   }
 }
