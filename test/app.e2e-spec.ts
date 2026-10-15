@@ -67,6 +67,62 @@ describe('AppController (e2e)', () => {
       .expect(503);
   });
 
+  it('/simulate/rate-limit (POST)', () => {
+    return request(app.getHttpServer())
+      .post('/simulate/rate-limit')
+      .send({
+        limit: 5,
+        windowSeconds: 10,
+      })
+      .expect(201)
+      .expect((res) => {
+        expect(res.body).toHaveProperty('id');
+        expect(res.body.limit).toBe(5);
+        expect(res.body.windowSeconds).toBe(10);
+      });
+  });
+
+  it('/simulate/rate-limit/:id (GET)', async () => {
+    const result = await request(app.getHttpServer())
+      .post('/simulate/rate-limit')
+      .send({
+        limit: 2,
+        windowSeconds: 10,
+      })
+      .expect(201);
+
+    const id = result.body.id;
+    for (let i = 0; i < 2; i++) {
+      await request(app.getHttpServer())
+        .get(`/simulate/rate-limit/${id}`)
+        .expect(200)
+        .expect('rate-limit response');
+    }
+
+    await request(app.getHttpServer())
+      .get(`/simulate/rate-limit/${id}`)
+      .expect(429)
+      .expect((res) => {
+        expect(res.headers).toHaveProperty('retry-after');
+      });
+  });
+
+  it('/simulate/rate-limit (GET)', async () => {
+    for (let i = 0; i < 5; i++) {
+      await request(app.getHttpServer())
+        .get('/simulate/rate-limit')
+        .expect(200)
+        .expect('rate-limit response');
+    }
+
+    await request(app.getHttpServer())
+      .get('/simulate/rate-limit')
+      .expect(429)
+      .expect((res) => {
+        expect(res.headers).toHaveProperty('retry-after');
+      });
+  });
+
   afterEach(async () => {
     await app.close();
   });
