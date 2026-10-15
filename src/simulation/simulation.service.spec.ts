@@ -47,19 +47,6 @@ describe('SimulationService', () => {
 
       expect(first.id).not.toEqual(second.id);
     });
-
-    it('stores the simulation configuration', () => {
-      const limit = 3;
-      const windowSeconds = 15;
-      const simulation = simulationService.createRateLimitSimulation(
-        limit,
-        windowSeconds,
-      );
-
-      const result = simulationService.checkRateLimit(simulation.id);
-
-      expect(result.outcome).toEqual('allowed');
-    });
   });
 
   describe('checkRateLimit', () => {
@@ -134,6 +121,17 @@ describe('SimulationService', () => {
       );
       expect(secondResult.outcome).toBe('allowed');
     });
+  });
+
+  describe('checkDefaultRateLimit', () => {
+    it('checks the default rate limit', () => {
+      const result: string[] = [];
+      for (let i = 0; i < 6; i++) {
+        result.push(simulationService.checkDefaultRateLimit().outcome);
+      }
+      expect(result).toEqual(['allowed', 'allowed', 'allowed', 'allowed', 'allowed', 'rate-limited']);
+    }
+  );
   });
 
   afterEach(() => {
