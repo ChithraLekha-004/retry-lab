@@ -176,11 +176,11 @@ describe('SimulationService', () => {
     });
 
     it('runs cleanup periodically after initialization', () => {
+      jest.useFakeTimers();
       const cleanupSpy = jest.spyOn(
         simulationService,
         'cleanupStaleSimulations',
       );
-      jest.useFakeTimers();
       simulationService.onModuleInit();
       jest.advanceTimersByTime(3 * 60 * 1000);
       expect(cleanupSpy).toHaveBeenCalledTimes(3);
@@ -188,11 +188,11 @@ describe('SimulationService', () => {
     });
 
     it('stops cleanup after destruction', () => {
+      jest.useFakeTimers();
       const cleanupSpy = jest.spyOn(
         simulationService,
         'cleanupStaleSimulations',
       );
-      jest.useFakeTimers();
       simulationService.onModuleInit();
       simulationService.onModuleDestroy();
       jest.advanceTimersByTime(3 * 60 * 1000);
