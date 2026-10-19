@@ -170,10 +170,34 @@ describe('SimulationService', () => {
 
     it('does not remove the default rate limit simulation', () => {
       const cleanupTime = Date.now() + 5 * 60 * 1000;
-      simulationService.cleanupStaleSimulations(cleanupTime); 
+      simulationService.cleanupStaleSimulations(cleanupTime);
       const result = simulationService.checkDefaultRateLimit();
       expect(result.outcome).toBe('allowed');
-    })
+    });
+
+    it('runs cleanup periodically after initialization', () => {
+      const cleanupSpy = jest.spyOn(
+        simulationService,
+        'cleanupStaleSimulations',
+      );
+      jest.useFakeTimers();
+      simulationService.onModuleInit();
+      jest.advanceTimersByTime(3 * 60 * 1000);
+      expect(cleanupSpy).toHaveBeenCalledTimes(3);
+      simulationService.onModuleDestroy();
+    });
+
+    it('stops cleanup after destruction', () => {
+      const cleanupSpy = jest.spyOn(
+        simulationService,
+        'cleanupStaleSimulations',
+      );
+      jest.useFakeTimers();
+      simulationService.onModuleInit();
+      simulationService.onModuleDestroy();
+      jest.advanceTimersByTime(3 * 60 * 1000);
+      expect(cleanupSpy).not.toHaveBeenCalled();
+    });
   });
 
   afterEach(() => {

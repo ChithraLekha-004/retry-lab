@@ -1,9 +1,10 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { RateLimitResult } from './types/rate-limit.types';
 
 const DEFAULT_RATE_LIMIT_ID = 'default-rate-limit';
 const SIMULATION_INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
+const SIMULATION_CLEANUP_INTERVAL_MS = 60 * 1000;
 
 type RateLimitConfig = {
   limit: number;
@@ -17,7 +18,20 @@ type RateLimitState = {
 };
 
 @Injectable()
-export class SimulationService {
+export class SimulationService implements OnModuleInit, OnModuleDestroy {
+  private cleanupInterval: ReturnType<typeof setInterval> | undefined;
+  onModuleInit() {
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupStaleSimulations();
+    }, SIMULATION_CLEANUP_INTERVAL_MS);
+  }
+
+  onModuleDestroy(): void {
+    if (this.cleanupInterval !== undefined) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = undefined;
+    }
+  }
   private readonly rateLimitConfig = new Map<string, RateLimitConfig>([
     [
       DEFAULT_RATE_LIMIT_ID,
