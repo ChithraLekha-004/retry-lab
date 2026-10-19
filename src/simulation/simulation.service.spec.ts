@@ -129,9 +129,51 @@ describe('SimulationService', () => {
       for (let i = 0; i < 6; i++) {
         result.push(simulationService.checkDefaultRateLimit().outcome);
       }
-      expect(result).toEqual(['allowed', 'allowed', 'allowed', 'allowed', 'allowed', 'rate-limited']);
-    }
-  );
+      expect(result).toEqual([
+        'allowed',
+        'allowed',
+        'allowed',
+        'allowed',
+        'allowed',
+        'rate-limited',
+      ]);
+    });
+  });
+
+  describe('cleanupStaleSimulations', () => {
+    it('removes an inactive simulation', () => {
+      const simulation = simulationService.createRateLimitSimulation(2, 10);
+
+      simulationService.cleanupStaleSimulations(Date.now() + 5 * 60 * 1000);
+
+      const result = simulationService.checkRateLimit(simulation.id);
+
+      expect(result.outcome).toBe('not-found');
+    });
+
+    it('keeps an active simulation', () => {
+      const simulation = simulationService.createRateLimitSimulation(2, 10);
+      const lastActivity = Date.now();
+
+      simulationService.checkRateLimit(simulation.id, lastActivity);
+
+      const cleanupTime = lastActivity + 5 * 60 * 1000 - 1;
+      simulationService.cleanupStaleSimulations(cleanupTime);
+
+      const result = simulationService.checkRateLimit(
+        simulation.id,
+        cleanupTime,
+      );
+
+      expect(result.outcome).toBe('allowed');
+    });
+
+    it('does not remove the default rate limit simulation', () => {
+      const cleanupTime = Date.now() + 5 * 60 * 1000;
+      simulationService.cleanupStaleSimulations(cleanupTime); 
+      const result = simulationService.checkDefaultRateLimit();
+      expect(result.outcome).toBe('allowed');
+    })
   });
 
   afterEach(() => {

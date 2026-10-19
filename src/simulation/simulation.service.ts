@@ -3,10 +3,12 @@ import { randomUUID } from 'node:crypto';
 import { RateLimitResult } from './types/rate-limit.types';
 
 const DEFAULT_RATE_LIMIT_ID = 'default-rate-limit';
+const SIMULATION_INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
 
 type RateLimitConfig = {
   limit: number;
   windowSeconds: number;
+  lastActivity: number;
 };
 
 type RateLimitState = {
@@ -17,7 +19,10 @@ type RateLimitState = {
 @Injectable()
 export class SimulationService {
   private readonly rateLimitConfig = new Map<string, RateLimitConfig>([
-    [DEFAULT_RATE_LIMIT_ID, { limit: 5, windowSeconds: 10 }],
+    [
+      DEFAULT_RATE_LIMIT_ID,
+      { limit: 5, windowSeconds: 10, lastActivity: Date.now() },
+    ],
   ]);
   private readonly rateLimitState = new Map<string, RateLimitState>();
 
@@ -34,7 +39,11 @@ export class SimulationService {
     windowSeconds: number,
   ): { id: string; limit: number; windowSeconds: number } {
     const id = randomUUID();
-    this.rateLimitConfig.set(id, { limit, windowSeconds });
+    this.rateLimitConfig.set(id, {
+      limit,
+      windowSeconds,
+      lastActivity: Date.now(),
+    });
     return { id, limit, windowSeconds };
   }
 
@@ -43,7 +52,7 @@ export class SimulationService {
     if (!config) {
       return { outcome: 'not-found' };
     }
-
+    config.lastActivity = now;
     const windowDurationMs = config.windowSeconds * 1000;
     const state = this.rateLimitState.get(id);
     const elapsedTime = state ? now - state.windowStart : 0;
@@ -66,5 +75,16 @@ export class SimulationService {
 
   checkDefaultRateLimit(): RateLimitResult {
     return this.checkRateLimit(DEFAULT_RATE_LIMIT_ID);
+  }
+
+  cleanupStaleSimulations(now: number = Date.now()): void {
+    for (const [id, config] of this.rateLimitConfig) {
+      if (id === DEFAULT_RATE_LIMIT_ID) continue;
+      let staleTime = now - config.lastActivity;
+      if (SIMULATION_INACTIVITY_LIMIT_MS <= staleTime) {
+        this.rateLimitConfig.delete(id);
+        this.rateLimitState.delete(id);
+      }
+    }
   }
 }
