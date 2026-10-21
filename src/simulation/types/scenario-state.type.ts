@@ -1,8 +1,8 @@
-import { ScenarioStepDto } from '../dto/scenario-step.dto';
+import { StoredScenarioStep } from './scenario-step.type';
 
 export interface ScenarioState {
   id: string;
-  steps: ScenarioStepDto[];
+  steps: StoredScenarioStep[];
   currentStepIndex: number;
   currentStepCount: number;
 }

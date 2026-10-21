@@ -9,6 +9,7 @@ import { ScenarioStepDto } from './scenario-step.dto';
 import { SlowStepDto } from './slow-step.dto';
 import { UnavailableStepDto } from './unavailable-step.dto';
 import { RateLimitStepDto } from './rate-limit-step.dto';
+import { ScenarioStep } from '../types/scenario-step.type';
 
 export class CreateScenarioDto {
   @IsArray()
@@ -25,5 +26,5 @@ export class CreateScenarioDto {
     },
     keepDiscriminatorProperty: true,
   })
-  steps: ScenarioStepDto[];
+  steps: ScenarioStep[];
 }
