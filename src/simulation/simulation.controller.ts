@@ -16,6 +16,8 @@ import { SlowQueryDto, UnavailableQueryDto } from './dto/slow-query.dto';
 import { CreateRateLimitDto } from './dto/create-rate-limit.dto';
 import type { Response } from 'express';
 import { RateLimitResult } from './types/rate-limit.types';
+import { CreateScenarioDto } from './dto/create-scenario.dto';
+import { StoredScenarioStep } from './types/scenario-step.type';
 
 @Controller('simulate')
 export class SimulationController {
@@ -77,5 +79,33 @@ export class SimulationController {
   ): string {
     const result = this.simulationService.checkDefaultRateLimit();
     return this.handleRateLimitResult(result, response);
+  }
+
+  @Post('scenarios')
+  createScenario(@Body() createScenarioDto: CreateScenarioDto): string {
+    return this.simulationService.createScenario(createScenarioDto.steps);
+  }
+
+  @Get('scenarios/:id/next-step')
+  async getNextStep(
+    @Param('id') id: string,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const nextStep: StoredScenarioStep = this.simulationService.getNextStep(id);
+
+    if (nextStep.type === 'slow') {
+      await this.simulationService.wait(nextStep.delay);
+      return 'slow-response';
+    }
+
+    if (nextStep.type === 'unavailable') {
+      await this.simulationService.wait(nextStep.delay);
+      throw new ServiceUnavailableException('Simulated service unavailable');
+    }
+
+    if (nextStep.type === 'rate-limit') {
+      const result = this.simulationService.checkRateLimit(nextStep.configId);
+      return this.handleRateLimitResult(result, response);
+    }
   }
 }

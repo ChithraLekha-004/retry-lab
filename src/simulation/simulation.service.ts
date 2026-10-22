@@ -1,6 +1,13 @@
-import { Injectable, OnModuleDestroy, OnModuleInit } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  OnModuleDestroy,
+  OnModuleInit,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import { RateLimitResult } from './types/rate-limit.types';
+import { ScenarioState } from './types/scenario-state.type';
+import { ScenarioStep, StoredScenarioStep } from './types/scenario-step.type';
 
 const DEFAULT_RATE_LIMIT_ID = 'default-rate-limit';
 const SIMULATION_INACTIVITY_LIMIT_MS = 5 * 60 * 1000;
@@ -39,6 +46,8 @@ export class SimulationService implements OnModuleInit, OnModuleDestroy {
     ],
   ]);
   private readonly rateLimitState = new Map<string, RateLimitState>();
+
+  private readonly scenarioStates = new Map<string, ScenarioState>();
 
   wait(delay: number): Promise<void> {
     return new Promise((resolve) => {
@@ -100,5 +109,44 @@ export class SimulationService implements OnModuleInit, OnModuleDestroy {
         this.rateLimitState.delete(id);
       }
     }
+  }
+
+  createScenario(steps: ScenarioStep[]): string {
+    const id = randomUUID();
+    const readyToSaveSteps: StoredScenarioStep[] = steps.map((step) => {
+      if (step.type === 'rate-limit') {
+        const id = this.createRateLimitSimulation(
+          step.limit,
+          step.windowSeconds,
+        ).id;
+        return { ...step, configId: id };
+      }
+      return step;
+    });
+
+    const scenarioState: ScenarioState = {
+      id,
+      steps: readyToSaveSteps,
+      currentStepIndex: 0,
+      currentStepCount: 0,
+    };
+    this.scenarioStates.set(id, scenarioState);
+    return id;
+  }
+
+  getNextStep(id: string) {
+    const scenario = this.scenarioStates.get(id);
+    if (!scenario) {
+      throw new NotFoundException(`Scenario with id ${id} not found`);
+    }
+    const currentStep = scenario.steps[scenario.currentStepIndex];
+    scenario.currentStepCount += 1;
+    if (scenario.currentStepCount >= currentStep.times) {
+      if (scenario.currentStepIndex < scenario.steps.length - 1) {
+        scenario.currentStepIndex += 1;
+        scenario.currentStepCount = 0;
+      }
+    }
+    return currentStep;
   }
 }
