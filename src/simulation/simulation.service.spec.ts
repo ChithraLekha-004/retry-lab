@@ -200,6 +200,68 @@ describe('SimulationService', () => {
     });
   });
 
+  describe('createScenario', () => {
+    it('returns the created scenario id', () => {
+      const result = simulationService.createScenario([
+        {
+          delay: 1000,
+          type: 'slow',
+          times: 2,
+        },
+        {
+          delay: 1000,
+          type: 'unavailable',
+          times: 2,
+        },
+      ]);
+      expect(result).toBeDefined();
+    });
+
+    it('generates unique scenario ids', () => {
+      const steps = [
+        {
+          type: 'slow' as const,
+          times: 1,
+          delay: 1000,
+        },
+      ];
+
+      const firstId = simulationService.createScenario(steps);
+      const secondId = simulationService.createScenario(steps);
+
+      expect(firstId).not.toBe(secondId);
+    });
+
+    it('rate limit step has rate limit configured and id added', () => {
+      const rateLimitCreateSpy = jest.spyOn(
+        simulationService,
+        'createRateLimitSimulation',
+      );
+      const result = simulationService.createScenario([
+        {
+          delay: 1000,
+          type: 'slow',
+          times: 2,
+        },
+        {
+          type: 'rate-limit',
+          times: 2,
+          limit: 2,
+          windowSeconds: 10,
+        },
+      ]);
+      expect(rateLimitCreateSpy).toHaveBeenCalledWith(2, 10);
+      simulationService.getNextStep(result);
+      simulationService.getNextStep(result);
+      const rateLimitStep = simulationService.getNextStep(result);
+      expect(rateLimitStep.type).toBe('rate-limit');
+
+      if (rateLimitStep.type === 'rate-limit') {
+        expect(rateLimitStep.configId).toBeDefined();
+      }
+    });
+  });
+
   afterEach(() => {
     jest.useRealTimers();
   });
