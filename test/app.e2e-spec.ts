@@ -123,6 +123,117 @@ describe('AppController (e2e)', () => {
       });
   });
 
+  it('/simulate/scenarios (POST)', () => {
+    return request(app.getHttpServer())
+      .post('/simulate/scenarios')
+      .send({
+        steps: [
+          {
+            type: 'slow',
+            times: 1,
+            delay: 1000,
+          },
+          {
+            type: 'unavailable',
+            times: 1,
+            delay: 1000,
+          },
+          {
+            type: 'rate-limit',
+            times: 1,
+            windowSeconds: 10,
+            limit: 5,
+          },
+        ],
+      })
+      .expect(201)
+      .expect((res) => {
+        expect(res.text).toBeTruthy();
+        ;
+      });
+  });
+
+  it('/simulate/scenarios (POST) rejects a rate-limit step with missing limit', () => {
+    return request(app.getHttpServer())
+      .post('/simulate/scenarios')
+      .send({
+        steps: [
+          {
+            type: 'rate-limit',
+            times: 1,
+            windowSeconds: 10,
+          },
+        ],
+      }).expect(400)
+  });
+
+  it('/simulate/scenarios (POST) with empty steps array', () => {
+    return request(app.getHttpServer())
+      .post('/simulate/scenarios')
+      .send({
+        steps: [
+        ],
+      }).expect(400)
+  });
+
+  it('/simulate/scenarios (POST) without steps', () => {
+    return request(app.getHttpServer())
+      .post('/simulate/scenarios')
+      .send({})
+      .expect(400);
+  });
+
+  it('executes a slow step', async () => {
+    const result = await request(app.getHttpServer())
+      .post('/simulate/scenarios')
+      .send({
+        steps: [{ type: 'slow', times: 1, delay: 0 }],
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get(`/simulate/scenarios/${result.text}/next-step`)
+      .expect(200)
+      .expect('slow-response');
+  });
+
+  it('returns 503 for an unavailable step', async () => {
+    const result = await request(app.getHttpServer())
+      .post('/simulate/scenarios')
+      .send({
+        steps: [{ type: 'unavailable', times: 1, delay: 0 }],
+      })
+      .expect(201);
+
+    await request(app.getHttpServer())
+      .get(`/simulate/scenarios/${result.text}/next-step`)
+      .expect(503);
+  });
+
+  it('advances to the next step after the configured executions', async () => {
+    const result = await request(app.getHttpServer())
+      .post('/simulate/scenarios')
+      .send({
+        steps: [
+          { type: 'slow', times: 2, delay: 0 },
+          { type: 'unavailable', times: 1, delay: 0 },
+        ],
+      })
+      .expect(201);
+
+    const url = `/simulate/scenarios/${result.text}/next-step`;
+
+    await request(app.getHttpServer()).get(url).expect(200).expect('slow-response');
+    await request(app.getHttpServer()).get(url).expect(200).expect('slow-response');
+    await request(app.getHttpServer()).get(url).expect(503);
+  });
+
+  it('returns 404 for an unknown scenario', async () => {
+    await request(app.getHttpServer())
+      .get('/simulate/scenarios/invalid-id/next-step')
+      .expect(404);
+  });
+
   afterEach(async () => {
     await app.close();
   });
