@@ -1,3 +1,4 @@
+import { NotFoundException } from '@nestjs/common';
 import { SimulationService } from './simulation.service';
 
 describe('SimulationService', () => {
@@ -259,6 +260,124 @@ describe('SimulationService', () => {
       if (rateLimitStep.type === 'rate-limit') {
         expect(rateLimitStep.configId).toBeDefined();
       }
+    });
+
+    describe('getNextStep', () => {
+      it('throws an exception if the scenario is not found', () => {
+        expect(() => simulationService.getNextStep('invalid-id')).toThrow(
+          NotFoundException,
+        );
+      });
+
+      it('keeps returning the final step after all steps are finished', () => {
+        const scenarioId = simulationService.createScenario([
+          {
+            type: 'slow',
+            times: 1,
+            delay: 1000,
+          },
+          {
+            type: 'unavailable',
+            times: 1,
+            delay: 500,
+          },
+        ]);
+
+        simulationService.getNextStep(scenarioId); // slow
+        const finalStep = simulationService.getNextStep(scenarioId); // unavailable
+        const repeatedFinalStep = simulationService.getNextStep(scenarioId);
+
+        expect(finalStep.type).toBe('unavailable');
+        expect(repeatedFinalStep).toEqual(finalStep);
+      });
+
+      it('advances to the next step after the configured number of executions', () => {
+        const scenarioId = simulationService.createScenario([
+          { type: 'slow', times: 2, delay: 1000 },
+          { type: 'unavailable', times: 1, delay: 500 },
+        ]);
+
+        expect(simulationService.getNextStep(scenarioId).type).toBe('slow');
+        expect(simulationService.getNextStep(scenarioId).type).toBe('slow');
+        expect(simulationService.getNextStep(scenarioId).type).toBe(
+          'unavailable',
+        );
+      });
+
+      it('keeps returning the only step in a single-step scenario', () => {
+        const scenarioId = simulationService.createScenario([
+          { type: 'slow', times: 1, delay: 1000 },
+        ]);
+
+        expect(simulationService.getNextStep(scenarioId).type).toBe('slow');
+        expect(simulationService.getNextStep(scenarioId).type).toBe('slow');
+      });
+
+      it('does not configure rate limiting for non-rate-limit steps', () => {
+        const rateLimitCreateSpy = jest.spyOn(
+          simulationService,
+          'createRateLimitSimulation',
+        );
+
+        simulationService.createScenario([
+          { type: 'slow', times: 1, delay: 1000 },
+          { type: 'unavailable', times: 1, delay: 500 },
+        ]);
+
+        expect(rateLimitCreateSpy).not.toHaveBeenCalled();
+      });
+    });
+  });
+
+  describe('getNextStep', () => {
+    it('throws an exception if the scenario is not found', () => {
+      expect(() => simulationService.getNextStep('invalid-id')).toThrow(
+        NotFoundException,
+      );
+    });
+
+    it('keeps returning the final step after all steps are finished', () => {
+      const scenarioId = simulationService.createScenario([
+        {
+          type: 'slow',
+          times: 1,
+          delay: 1000,
+        },
+        {
+          type: 'unavailable',
+          times: 1,
+          delay: 500,
+        },
+      ]);
+
+      simulationService.getNextStep(scenarioId); // slow
+      const finalStep = simulationService.getNextStep(scenarioId); // unavailable
+      const repeatedFinalStep = simulationService.getNextStep(scenarioId);
+
+      expect(finalStep.type).toBe('unavailable');
+      expect(repeatedFinalStep).toEqual(finalStep);
+    });
+
+    it('advances to the next step after the configured number of executions', () => {
+      const scenarioId = simulationService.createScenario([
+        { type: 'slow', times: 2, delay: 1000 },
+        { type: 'unavailable', times: 1, delay: 500 },
+      ]);
+
+      expect(simulationService.getNextStep(scenarioId).type).toBe('slow');
+      expect(simulationService.getNextStep(scenarioId).type).toBe('slow');
+      expect(simulationService.getNextStep(scenarioId).type).toBe(
+        'unavailable',
+      );
+    });
+
+    it('keeps returning the only step in a single-step scenario', () => {
+      const scenarioId = simulationService.createScenario([
+        { type: 'slow', times: 1, delay: 1000 },
+      ]);
+
+      expect(simulationService.getNextStep(scenarioId).type).toBe('slow');
+      expect(simulationService.getNextStep(scenarioId).type).toBe('slow');
     });
   });
 
